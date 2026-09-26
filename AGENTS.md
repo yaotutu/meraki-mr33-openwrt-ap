@@ -10,7 +10,7 @@
 - 架构：`arm_cortex-a7_neon-vfpv4`
 - Profile：`meraki_mr33`
 - 固件定位：纯 AP / dumb AP
-- 语言/界面：LuCI、HTTPS、简体中文
+- 语言/界面：LuCI（HTTP）、简体中文
 - 无线：`ath10k`，2.4GHz + 5GHz
 - 回程：仅有线
 - OpenWrt 基线：`24.10.8`
@@ -23,7 +23,7 @@ MR33 只负责：
 - 二层桥接
 - 802.11k/v/r 漫游参数
 - 可选 `usteer` 漫游辅助
-- LuCI 管理界面
+- LuCI 管理界面（仅内网 HTTP）
 
 MR33 不承担：
 
