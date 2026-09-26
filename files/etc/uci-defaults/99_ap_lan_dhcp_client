@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Use the wired LAN bridge as a DHCP client for AP management.
+uci -q set network.lan.proto='dhcp'
+
+# Remove stale IPv4 static settings if this image is installed over a
+# configuration that previously used a static LAN address.
+for option in ipaddr netmask gateway dns broadcast; do
+	uci -q delete "network.lan.$option"
+done
+
+uci -q commit network
+exit 0

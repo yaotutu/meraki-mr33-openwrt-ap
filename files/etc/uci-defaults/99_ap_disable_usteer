@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Keep usteer available as an optional package, but do not enable roaming
+# automation before the two-radio layout and manual 802.11k/v settings are
+# verified on real MR33 hardware.
+[ -x /etc/init.d/usteer ] && /etc/init.d/usteer disable || true
+exit 0

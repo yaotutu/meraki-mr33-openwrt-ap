@@ -1,5 +1,4 @@
-# Official baseline workflow: no local package or filesystem customizations yet.
-name: Build MR33 official baseline
+name: Build MR33 AP image
 
 on:
   workflow_dispatch:
@@ -17,6 +16,13 @@ env:
   SUBTARGET: generic
   ARCH: arm_cortex-a7_neon-vfpv4
   PROFILE: meraki_mr33
+  PACKAGES: >-
+    luci-ssl luci-i18n-base-zh-cn wpad-basic-mbedtls usteer luci-app-usteer
+    -dnsmasq -odhcpd-ipv6only -firewall4 -nftables -nftables-json
+    -kmod-nft-core -kmod-nft-fib -kmod-nft-nat -kmod-nft-offload
+    -ppp -ppp-mod-pppoe -kmod-ppp -kmod-pppoe -kmod-pppox -kmod-slhc
+    -kmod-usb-core -kmod-usb-dwc3 -kmod-usb-dwc3-qcom
+    -kmod-usb-xhci-hcd -kmod-usb3
   IMAGEBUILDER: openwrt-imagebuilder-24.10.8-ipq40xx-generic.Linux-x86_64.tar.zst
   BASE_URL: https://downloads.openwrt.org/releases/24.10.8/targets/ipq40xx/generic
 
@@ -26,6 +32,11 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Check out repository files
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
       - name: Download official metadata
         shell: bash
         run: |
@@ -92,9 +103,10 @@ jobs:
               exit 1
           fi
 
-          # Deliberately omit PACKAGES and FILES. This job must reproduce the
-          # official profile defaults before we introduce AP-specific changes.
-          make -C "$imagebuilder_root" image PROFILE="$PROFILE"
+          make -C "$imagebuilder_root" image \
+            PROFILE="$PROFILE" \
+            PACKAGES="$PACKAGES" \
+            FILES="$GITHUB_WORKSPACE/files"
 
           output_dir="$imagebuilder_root/bin/targets/$TARGET/$SUBTARGET"
           mkdir -p "$RUNNER_TEMP/mr33-release"
@@ -116,22 +128,49 @@ jobs:
           generated_sha256="$(sha256sum "$sysupgrade" | awk '{print $1}')"
           printf '%s  %s\n' "$generated_sha256" "$(basename "$sysupgrade")" \
             > "$release_dir/generated-sha256sums"
-
-          # ImageBuilder assembles a new image; it is not required to be
-          # byte-identical to the prebuilt release image. Validate the
-          # generated artifact against its own recorded checksum instead.
           (
             cd "$release_dir"
             sha256sum --check --strict generated-sha256sums
           )
 
-          echo '--- baseline manifest ---'
+          forbidden_patterns=(
+            '^dnsmasq '
+            '^odhcpd'
+            '^firewall4 '
+            '^(nftables|nftables-json|kmod-nft-)'
+            '^(ppp|ppp-mod-pppoe|kmod-ppp|kmod-pppoe|kmod-pppox|kmod-slhc) '
+            '^kmod-.*usb'
+          )
+          for pattern in "${forbidden_patterns[@]}"; do
+            if grep -Eq "$pattern" "$manifest"; then
+              echo "Forbidden package matched manifest pattern: $pattern" >&2
+              grep -En "$pattern" "$manifest" >&2
+              exit 1
+            fi
+          done
+
+          required_patterns=(
+            '^wpad-basic-mbedtls '
+            '^luci-ssl '
+            '^luci-i18n-base-zh-cn '
+            '^usteer '
+            '^luci-app-usteer '
+            '^(ath10k-|kmod-ath10k)'
+          )
+          for pattern in "${required_patterns[@]}"; do
+            if ! grep -Eq "$pattern" "$manifest"; then
+              echo "Required package pattern missing from manifest: $pattern" >&2
+              exit 1
+            fi
+          done
+
+          echo '--- AP candidate manifest ---'
           cat "$manifest"
 
-      - name: Upload baseline artifact
+      - name: Upload AP candidate artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: mr33-openwrt-${{ env.OPENWRT_VERSION }}-official-baseline
+          name: mr33-openwrt-${{ env.OPENWRT_VERSION }}-ap-candidate
           path: ${{ runner.temp }}/mr33-release
           if-no-files-found: error
           retention-days: 30
@@ -142,11 +181,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="MR33_IB_${OPENWRT_VERSION}_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          tag="MR33_AP_${OPENWRT_VERSION}_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "MR33 OpenWrt ${OPENWRT_VERSION} official baseline" \
-            --notes "Official OpenWrt ImageBuilder baseline for Cisco Meraki MR33. No repository-local files, package exclusions, or AP-specific UCI defaults are applied in this build." \
+            --title "MR33 OpenWrt ${OPENWRT_VERSION} AP candidate" \
+            --notes "Cisco Meraki MR33 wired-backhaul AP candidate built from the official OpenWrt ImageBuilder. Wi-Fi is disabled on first boot, LAN uses DHCP client mode, and the upstream MT3000 remains the DHCP/DNS authority." \
             "$RUNNER_TEMP/mr33-release/openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs-sysupgrade.bin" \
             "$RUNNER_TEMP/mr33-release/openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}.manifest" \
             "$RUNNER_TEMP/mr33-release/generated-sha256sums"

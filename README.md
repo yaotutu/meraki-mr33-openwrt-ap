@@ -34,15 +34,17 @@ PoE 交换机
 
 ## 状态
 
-当前先实现官方基线构建：
+官方基线已经完成构建验证。当前进入第一版 AP 定制：
 
-- 使用 OpenWrt `24.10.8` 官方 ImageBuilder；
+- 继续使用 OpenWrt `24.10.8` 官方 ImageBuilder；
 - 使用 `meraki_mr33` 官方 profile；
-- 不传入仓库本地 `PACKAGES`、`FILES` 或 UCI 定制；
-- 先确认官方 ImageBuilder 构建链路和产物校验正常；
-- 官方基线通过后，再单独加入 AP 模式配置和软件包精简。
+- 加入 LuCI HTTPS、简体中文、`wpad-basic-mbedtls` 和可选 `usteer`；
+- 首次启动将 LAN 设置为 DHCP client；
+- 首次启动关闭 DHCP/RA 服务、所有 Wi-Fi radio 和 `usteer`；
+- 不预设 SSID、密码、信道或未知 radio 的特殊行为；
+- 从镜像中移除 DNS、DHCP server、Firewall/NFT、PPPoE 和 USB 相关组件。
 
-当前尚未创建 `files/` 定制目录。
+该版本仍需在真实 MR33 上验证 `wifi status`、`iw dev` 和 `dmesg | grep ath10k`，之后再决定是否调整 radio 或漫游配置。
 
 ## License
 

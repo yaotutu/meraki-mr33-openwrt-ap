@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Do not guess SSIDs, passwords, channels, or the number of radios. The
+# operator will configure the client radios manually after first boot.
+for radio in $(uci -q show wireless | \
+	sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+	uci -q set "wireless.$radio.disabled=1"
+done
+
+uci -q commit wireless
+exit 0

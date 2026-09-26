@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# The upstream MT3000 remains the only DHCP/DNS authority.
+uci -q set dhcp.lan.ignore='1'
+uci -q set dhcp.lan.dhcpv6='disabled'
+uci -q set dhcp.lan.ra='disabled'
+uci -q set dhcp.lan.ndp='disabled'
+uci -q commit dhcp
+
+# Keep the image safe even if one of these packages is later installed.
+[ -x /etc/init.d/dnsmasq ] && /etc/init.d/dnsmasq disable || true
+[ -x /etc/init.d/odhcpd ] && /etc/init.d/odhcpd disable || true
+exit 0
