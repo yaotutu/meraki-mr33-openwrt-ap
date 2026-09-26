@@ -16,10 +16,13 @@ env:
   SUBTARGET: generic
   ARCH: arm_cortex-a7_neon-vfpv4
   PROFILE: meraki_mr33
+  # Use ImageBuilder's standard first-boot service-disable mechanism.
+  # dnsmasq and odhcpd are excluded from the package set entirely.
+  DISABLED_SERVICES: firewall usteer
   # In OpenWrt 24.10.8, luci-ssl depends on luci-light, which pulls
   # luci-app-firewall and luci-proto-ppp. Those runtime dependencies cannot
-  # be removed without dropping LuCI HTTPS; the firewall service is disabled
-  # by a first-boot script instead.
+  # be removed without dropping LuCI HTTPS; the firewall init script is
+  # disabled through ImageBuilder's standard DISABLED_SERVICES mechanism.
   PACKAGES: >-
     luci-ssl luci-i18n-base-zh-cn wpad-basic-mbedtls usteer luci-app-usteer
     -dnsmasq -odhcpd-ipv6only
@@ -108,6 +111,7 @@ jobs:
           make -C "$imagebuilder_root" image \
             PROFILE="$PROFILE" \
             PACKAGES="$PACKAGES" \
+            DISABLED_SERVICES="$DISABLED_SERVICES" \
             FILES="$GITHUB_WORKSPACE/files"
 
           output_dir="$imagebuilder_root/bin/targets/$TARGET/$SUBTARGET"
