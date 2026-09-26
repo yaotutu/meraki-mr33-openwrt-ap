@@ -38,13 +38,14 @@ PoE 交换机
 
 - 继续使用 OpenWrt `24.10.8` 官方 ImageBuilder；
 - 使用 `meraki_mr33` 官方 profile；
-- 加入普通 HTTP LuCI、简体中文、`wpad-basic-mbedtls` 和可选 `usteer`；
+- 加入精简的普通 HTTP LuCI 组件、简体中文、`wpad-basic-mbedtls` 和可选 `usteer`；
 - 首次启动将 LAN 设置为 DHCP client；
-- 首次启动关闭 DHCP/RA 服务、Firewall、`usteer`、所有 Wi-Fi radio；
+- 固件不包含 DHCP/DNS server 和 Firewall 服务；`usteer` 保留软件但默认关闭；所有 Wi-Fi radio 首次启动关闭；
 - 不预设 SSID、密码、信道或未知 radio 的特殊行为；
 - 移除可独立移除的 DNS、DHCP server 和 USB 相关组件；
-- 由于这是仅在内网访问的管理 AP，固件不启用 LuCI HTTPS，避免额外引入 TLS 后端；
-  LuCI 仍会带入部分 Firewall/PPP/NFT 依赖，但这些包只作为界面依赖保留，构建时通过 ImageBuilder 的 `DISABLED_SERVICES` 禁用 Firewall 和 `usteer`，不配置 PPPoE、NAT 或防火墙规则。
+- 由于这是仅在内网访问的管理 AP，固件不启用 LuCI HTTPS，避免引入 TLS 后端；
+  LuCI 不使用 `luci-light` 组合包，而是显式选择管理页面所需组件，删除 Firewall、PPP、IPv6 LuCI 协议和 NFT 相关包；
+  `usteer` 软件保留，但通过 ImageBuilder 的 `DISABLED_SERVICES` 默认关闭。
 
 该版本仍需在真实 MR33 上验证 `wifi status`、`iw dev` 和 `dmesg | grep ath10k`，之后再决定是否调整 radio 或漫游配置。
 

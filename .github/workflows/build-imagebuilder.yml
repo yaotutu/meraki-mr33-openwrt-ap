@@ -16,11 +16,17 @@ env:
   SUBTARGET: generic
   ARCH: arm_cortex-a7_neon-vfpv4
   PROFILE: meraki_mr33
-  # LAN-only management: use LuCI over HTTP, not HTTPS.
-  # ImageBuilder still disables services that must not run on a dumb AP.
-  DISABLED_SERVICES: firewall usteer
+  # LAN-only management: use a minimal LuCI HTTP component set, not HTTPS.
+  # usteer remains installed as an optional package but is disabled by default.
+  DISABLED_SERVICES: usteer
   PACKAGES: >-
-    luci-light luci-i18n-base-zh-cn wpad-basic-mbedtls usteer luci-app-usteer
+    luci-base luci-mod-admin-full luci-mod-status luci-mod-system
+    luci-mod-network luci-theme-bootstrap luci-i18n-base-zh-cn
+    uhttpd uhttpd-mod-ubus usteer luci-app-usteer wpad-basic-mbedtls
+    -luci-light -luci-ssl -luci-ssl-openssl
+    -luci-app-firewall -luci-proto-ipv6 -luci-proto-ppp
+    -firewall4 -nftables -nftables-json
+    -ppp -ppp-mod-pppoe -kmod-ppp -kmod-pppoe -kmod-pppox -kmod-slhc
     -dnsmasq -odhcpd-ipv6only
     -kmod-usb-core -kmod-usb-dwc3 -kmod-usb-dwc3-qcom
     -kmod-usb-xhci-hcd -kmod-usb3
@@ -138,6 +144,15 @@ jobs:
           forbidden_patterns=(
             '^dnsmasq'
             '^odhcpd'
+            '^luci-light '
+            '^luci-ssl(-| )'
+            '^firewall4 '
+            '^luci-app-firewall '
+            '^luci-proto-ipv6 '
+            '^luci-proto-ppp '
+            '^nftables(-json)? '
+            '^ppp(-| )'
+            '^kmod-(nft|ppp|pppoe|pppox|slhc)'
             '^kmod-.*usb'
           )
           for pattern in "${forbidden_patterns[@]}"; do
@@ -150,8 +165,13 @@ jobs:
 
           required_patterns=(
             '^wpad-basic-mbedtls '
-            '^luci-light '
+            '^luci-base '
+            '^luci-mod-admin-full '
+            '^luci-mod-network '
+            '^luci-theme-bootstrap '
             '^luci-i18n-base-zh-cn '
+            '^uhttpd '
+            '^uhttpd-mod-ubus '
             '^usteer '
             '^luci-app-usteer '
             '^(ath10k-|kmod-ath10k)'
