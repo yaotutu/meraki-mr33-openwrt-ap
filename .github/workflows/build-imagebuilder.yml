@@ -26,6 +26,7 @@ env:
     -luci-light -luci-ssl -luci-ssl-openssl
     -luci-app-firewall -luci-proto-ipv6 -luci-proto-ppp
     -firewall4 -nftables -nftables-json
+    -kmod-nft-core -kmod-nft-nat -kmod-nft-offload
     -ppp -ppp-mod-pppoe -kmod-ppp -kmod-pppoe -kmod-pppox -kmod-slhc
     -dnsmasq -odhcpd-ipv6only
     -kmod-usb-core -kmod-usb-dwc3 -kmod-usb-dwc3-qcom
