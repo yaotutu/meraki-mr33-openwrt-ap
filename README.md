@@ -34,7 +34,15 @@ PoE 交换机
 
 ## 状态
 
-项目刚初始化，尚未开始构建工作流和 `files/` 定制。
+当前先实现官方基线构建：
+
+- 使用 OpenWrt `24.10.8` 官方 ImageBuilder；
+- 使用 `meraki_mr33` 官方 profile；
+- 不传入仓库本地 `PACKAGES`、`FILES` 或 UCI 定制；
+- 先确认官方 ImageBuilder 构建链路和产物校验正常；
+- 官方基线通过后，再单独加入 AP 模式配置和软件包精简。
+
+当前尚未创建 `files/` 定制目录。
 
 ## License
 

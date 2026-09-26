@@ -1,0 +1,164 @@
+name: Build MR33 official baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mr33-imagebuilder-${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  OPENWRT_VERSION: '24.10.8'
+  TARGET: ipq40xx
+  SUBTARGET: generic
+  ARCH: arm_cortex-a7_neon-vfpv4
+  PROFILE: meraki_mr33
+  IMAGEBUILDER: openwrt-imagebuilder-24.10.8-ipq40xx-generic.Linux-x86_64.tar.zst
+  BASE_URL: https://downloads.openwrt.org/releases/24.10.8/targets/ipq40xx/generic
+
+jobs:
+  build:
+    name: Build official ImageBuilder baseline
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Download official metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mr33-input"
+          cd "$RUNNER_TEMP/mr33-input"
+
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output sha256sums \
+            "$BASE_URL/sha256sums"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output profiles.json \
+            "$BASE_URL/profiles.json"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = json.loads(Path("profiles.json").read_text())
+          profile = metadata["profiles"].get(os.environ["PROFILE"])
+          if profile is None:
+              raise SystemExit(f"profile not found: {os.environ['PROFILE']}")
+
+          if metadata["target"] != f"{os.environ['TARGET']}/{os.environ['SUBTARGET']}":
+              raise SystemExit(f"unexpected target: {metadata['target']}")
+
+          print(f"OpenWrt version: {metadata['version_number']}")
+          print(f"Target: {metadata['target']}")
+          print(f"Profile: {os.environ['PROFILE']}")
+          print(f"Supported devices: {', '.join(profile['supported_devices'])}")
+          print(f"Official device packages: {', '.join(profile.get('device_packages', []))}")
+          PY
+
+      - name: Download and verify official ImageBuilder
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/mr33-input"
+
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output "$IMAGEBUILDER" \
+            "$BASE_URL/$IMAGEBUILDER"
+
+          expected_sha256="$(awk -v file="*$IMAGEBUILDER" '$2 == file { print $1 }' sha256sums)"
+          if [[ -z "$expected_sha256" ]]; then
+              echo "ImageBuilder checksum not found in sha256sums" >&2
+              exit 1
+          fi
+
+          printf '%s  %s\n' "$expected_sha256" "$IMAGEBUILDER" | sha256sum --check --strict
+
+      - name: Build without local customization
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mr33-imagebuilder"
+          tar --zstd --extract --file "$RUNNER_TEMP/mr33-input/$IMAGEBUILDER" \
+            --directory "$RUNNER_TEMP/mr33-imagebuilder"
+
+          imagebuilder_root="$(find "$RUNNER_TEMP/mr33-imagebuilder" -mindepth 1 -maxdepth 1 -type d -name 'openwrt-imagebuilder-*' -print -quit)"
+          if [[ -z "$imagebuilder_root" ]]; then
+              echo "Unable to locate extracted ImageBuilder directory" >&2
+              exit 1
+          fi
+
+          # Deliberately omit PACKAGES and FILES. This job must reproduce the
+          # official profile defaults before we introduce AP-specific changes.
+          make -C "$imagebuilder_root" image PROFILE="$PROFILE"
+
+          output_dir="$imagebuilder_root/bin/targets/$TARGET/$SUBTARGET"
+          mkdir -p "$RUNNER_TEMP/mr33-release"
+          cp -a "$output_dir/." "$RUNNER_TEMP/mr33-release/"
+          cp "$RUNNER_TEMP/mr33-input/profiles.json" "$RUNNER_TEMP/mr33-release/"
+          cp "$RUNNER_TEMP/mr33-input/sha256sums" "$RUNNER_TEMP/mr33-release/official-sha256sums"
+
+      - name: Verify baseline output
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/mr33-release"
+          sysupgrade="$release_dir/openwrt-$OPENWRT_VERSION-$TARGET-$SUBTARGET-$PROFILE-squashfs-sysupgrade.bin"
+          manifest="$release_dir/openwrt-$OPENWRT_VERSION-$TARGET-$SUBTARGET-$PROFILE.manifest"
+
+          test -s "$sysupgrade"
+          test -s "$manifest"
+
+          generated_sha256="$(sha256sum "$sysupgrade" | awk '{print $1}')"
+          expected_sha256="$(python3 - "$release_dir/profiles.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          image_name = Path(sys.argv[1]).parent.joinpath(
+              f"openwrt-{json.loads(Path(sys.argv[1]).read_text())['version_number']}-"
+              "ipq40xx-generic-meraki_mr33-squashfs-sysupgrade.bin"
+          ).name
+          metadata = json.loads(Path(sys.argv[1]).read_text())
+          image = next(item for item in metadata["profiles"]["meraki_mr33"]["images"] if item["name"] == image_name)
+          print(image["sha256_unsigned"])
+          PY
+          )"
+
+          if [[ "$generated_sha256" != "$expected_sha256" ]]; then
+              echo "Generated image checksum differs from the official unsigned profile checksum." >&2
+              echo "generated: $generated_sha256" >&2
+              echo "official:  $expected_sha256" >&2
+              exit 1
+          fi
+
+          printf '%s  %s\n' "$generated_sha256" "$(basename "$sysupgrade")" \
+            > "$release_dir/generated-sha256sums"
+
+          echo '--- baseline manifest ---'
+          cat "$manifest"
+
+      - name: Upload baseline artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mr33-openwrt-${{ env.OPENWRT_VERSION }}-official-baseline
+          path: ${{ runner.temp }}/mr33-release
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish baseline release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="MR33_IB_${OPENWRT_VERSION}_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" \
+            --title "MR33 OpenWrt ${OPENWRT_VERSION} official baseline" \
+            --notes "Official OpenWrt ImageBuilder baseline for Cisco Meraki MR33. No repository-local files, package exclusions, or AP-specific UCI defaults are applied in this build." \
+            "$RUNNER_TEMP/mr33-release/openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs-sysupgrade.bin" \
+            "$RUNNER_TEMP/mr33-release/openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}.manifest" \
+            "$RUNNER_TEMP/mr33-release/generated-sha256sums"
