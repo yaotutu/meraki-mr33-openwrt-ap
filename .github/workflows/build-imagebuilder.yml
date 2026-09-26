@@ -16,11 +16,13 @@ env:
   SUBTARGET: generic
   ARCH: arm_cortex-a7_neon-vfpv4
   PROFILE: meraki_mr33
+  # In OpenWrt 24.10.8, luci-ssl depends on luci-light, which pulls
+  # luci-app-firewall and luci-proto-ppp. Those runtime dependencies cannot
+  # be removed without dropping LuCI HTTPS; the firewall service is disabled
+  # by a first-boot script instead.
   PACKAGES: >-
     luci-ssl luci-i18n-base-zh-cn wpad-basic-mbedtls usteer luci-app-usteer
-    -dnsmasq -odhcpd-ipv6only -firewall4 -nftables -nftables-json
-    -kmod-nft-core -kmod-nft-fib -kmod-nft-nat -kmod-nft-offload
-    -ppp -ppp-mod-pppoe -kmod-ppp -kmod-pppoe -kmod-pppox -kmod-slhc
+    -dnsmasq -odhcpd-ipv6only
     -kmod-usb-core -kmod-usb-dwc3 -kmod-usb-dwc3-qcom
     -kmod-usb-xhci-hcd -kmod-usb3
   IMAGEBUILDER: openwrt-imagebuilder-24.10.8-ipq40xx-generic.Linux-x86_64.tar.zst
@@ -28,7 +30,7 @@ env:
 
 jobs:
   build:
-    name: Build official ImageBuilder baseline
+    name: Build MR33 AP candidate
     runs-on: ubuntu-24.04
 
     steps:
@@ -89,7 +91,7 @@ jobs:
 
           printf '%s  %s\n' "$expected_sha256" "$IMAGEBUILDER" | sha256sum --check --strict
 
-      - name: Build without local customization
+      - name: Build AP candidate with local customization
         shell: bash
         run: |
           set -euo pipefail
@@ -114,7 +116,7 @@ jobs:
           cp "$RUNNER_TEMP/mr33-input/profiles.json" "$RUNNER_TEMP/mr33-release/"
           cp "$RUNNER_TEMP/mr33-input/sha256sums" "$RUNNER_TEMP/mr33-release/official-sha256sums"
 
-      - name: Verify baseline output
+      - name: Verify AP candidate output
         shell: bash
         run: |
           set -euo pipefail
@@ -134,11 +136,8 @@ jobs:
           )
 
           forbidden_patterns=(
-            '^dnsmasq '
+            '^dnsmasq'
             '^odhcpd'
-            '^firewall4 '
-            '^(nftables|nftables-json|kmod-nft-)'
-            '^(ppp|ppp-mod-pppoe|kmod-ppp|kmod-pppoe|kmod-pppox|kmod-slhc) '
             '^kmod-.*usb'
           )
           for pattern in "${forbidden_patterns[@]}"; do
@@ -175,7 +174,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish baseline release
+      - name: Publish AP candidate release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

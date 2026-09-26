@@ -42,7 +42,9 @@ PoE 交换机
 - 首次启动将 LAN 设置为 DHCP client；
 - 首次启动关闭 DHCP/RA 服务、所有 Wi-Fi radio 和 `usteer`；
 - 不预设 SSID、密码、信道或未知 radio 的特殊行为；
-- 从镜像中移除 DNS、DHCP server、Firewall/NFT、PPPoE 和 USB 相关组件。
+- 移除可独立移除的 DNS、DHCP server 和 USB 相关组件；
+- 由于 OpenWrt `24.10.8` 的 `luci-ssl` 依赖链会带入 Firewall/PPP/NFT 相关包，
+  这些包仅作为 LuCI 依赖保留，Firewall 服务首次启动时禁用，不配置 PPPoE、NAT 或防火墙规则。
 
 该版本仍需在真实 MR33 上验证 `wifi status`、`iw dev` 和 `dmesg | grep ath10k`，之后再决定是否调整 radio 或漫游配置。
 
