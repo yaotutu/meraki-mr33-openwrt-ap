@@ -144,6 +144,7 @@ jobs:
           set -euo pipefail
           tag="MR33_IB_${OPENWRT_VERSION}_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "MR33 OpenWrt ${OPENWRT_VERSION} official baseline" \
             --notes "Official OpenWrt ImageBuilder baseline for Cisco Meraki MR33. No repository-local files, package exclusions, or AP-specific UCI defaults are applied in this build." \
             "$RUNNER_TEMP/mr33-release/openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs-sysupgrade.bin" \
