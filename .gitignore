@@ -1,0 +1,10 @@
+/imagebuilder/
+/buildspace/
+/bin/
+/files-*/
+/*.tar.zst
+/*.tar.xz
+/*.img
+/*.bin
+/*.itb
+/sha256sums
