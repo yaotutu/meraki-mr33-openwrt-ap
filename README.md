@@ -47,7 +47,22 @@ PoE 交换机
   LuCI 不使用 `luci-light` 组合包，而是显式选择管理页面所需组件，删除 Firewall、PPP、IPv6 LuCI 协议和 NFT 相关包；
   `usteer` 软件保留，但通过 ImageBuilder 的 `DISABLED_SERVICES` 默认关闭。
 
-该版本仍需在真实 MR33 上验证 `wifi status`、`iw dev` 和 `dmesg | grep ath10k`，之后再决定是否调整 radio 或漫游配置。
+当前软件构建阶段已完成，最新构建已发布并通过 CI 校验：
+
+- Release：`MR33_AP_24.10.8_36260615447_1`
+- 固件：`openwrt-24.10.8-ipq40xx-generic-meraki_mr33-squashfs-sysupgrade.bin`
+- 固件大小：`8,356,912` bytes（约 `7.97 MiB`）
+- SHA256：`b8900b6e7c343e819c35b141448f8a16d26840a48b93b2a2782a82c5adb623d7`
+
+当前下一步是实机验证，而不是继续盲目删包。刷入 MR33 后需要确认：
+
+```sh
+wifi status
+iw dev
+dmesg | grep ath10k
+```
+
+同时确认 LAN 能从 MT3000 获取管理地址、LuCI HTTP 可以访问、首次启动 Wi-Fi 保持关闭、`usteer` 默认未运行，并根据实际 radio 枚举结果决定是否需要调整无线配置。未完成实机输出确认前，不预设 SSID、密码、信道、802.11k/v/r 或第三 radio 行为。
 
 ## License
 
